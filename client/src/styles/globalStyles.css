@@ -1,0 +1,109 @@
+:root {
+  font-size: var(--font-size-base);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-text);
+}
+
+h1 {
+  font-size: var(--font-size-xxl);
+}
+h2 {
+  font-size: var(--font-size-xl);
+}
+h3 {
+  font-size: var(--font-size-lg);
+}
+p,
+span,
+div {
+  font-size: var(--font-size-base);
+}
+
+.card {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.card-header {
+  background-color: var(--color-surface);
+  border-bottom-color: var(--color-border);
+  padding: var(--spacing-md);
+}
+
+.text-muted {
+  color: var(--color-text-secondary) !important;
+}
+
+.form-control,
+.form-select {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  padding: var(--spacing-md);
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.btn {
+  padding: var(--spacing-md);
+  margin: var(--spacing-sm);
+}
+
+.btn-outline-primary {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.card-body {
+  padding: var(--spacing-md);
+}
+
+.row {
+  gap: var(--spacing-md);
+}
+
+/* Compact mode adjustments */
+[data-compact="true"] {
+  .card,
+  .card-header,
+  .card-body {
+    padding: var(--spacing-sm);
+  }
+
+  .btn {
+    padding: var(--spacing-sm);
+    margin: var(--spacing-xs);
+  }
+
+  .form-control,
+  .form-select {
+    padding: var(--spacing-sm);
+  }
+
+  .row {
+    gap: var(--spacing-sm);
+  }
+}
