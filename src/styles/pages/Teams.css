@@ -1,0 +1,138 @@
+.teams-container {
+  padding: var(--spacing-lg);
+}
+
+.teams-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.teams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.team-card {
+  background: var(--color-surface);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.team-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--color-shadow);
+}
+
+.team-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.team-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-size: 1.5rem;
+}
+
+.team-info {
+  flex: 1;
+}
+
+.team-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.team-meta {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.team-description {
+  color: var(--color-text);
+  margin-bottom: var(--spacing-md);
+}
+
+.team-stats {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.team-stat {
+  flex: 1;
+  text-align: center;
+  padding: var(--spacing-sm);
+  background: var(--color-background);
+  border-radius: var(--border-radius);
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.team-members {
+  display: flex;
+  align-items: center;
+}
+
+.member-avatars {
+  display: flex;
+  margin-right: var(--spacing-sm);
+}
+
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  font-weight: 500;
+  margin-left: -8px;
+}
+
+.member-avatar:first-child {
+  margin-left: 0;
+}
+
+.member-count {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.create-team-modal {
+  max-width: 500px;
+  margin: var(--spacing-xl) auto;
+}
+
+.team-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}

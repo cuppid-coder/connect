@@ -1,0 +1,155 @@
+.profile-section {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-xl);
+  box-shadow: var(--color-shadow);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid var(--color-border);
+}
+
+.avatar-upload {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-lg);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+
+.avatar-upload img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-upload .upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.avatar-upload:hover .upload-overlay {
+  opacity: 1;
+}
+
+.avatar-upload .upload-icon {
+  color: white;
+  font-size: 1.5rem;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.stat-card {
+  background: var(--color-background);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius);
+  text-align: center;
+}
+
+.stat-card .stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat-card .stat-label {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.activity-section {
+  margin-top: var(--spacing-xl);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.activity-filters {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.activity-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+}
+
+.activity-item {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--spacing-xs);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.completed-indicator {
+  color: #22c55e;
+}
+
+.overdue-indicator {
+  color: #ef4444;
+}
+
+.edit-mode .form-control {
+  background: var(--color-background);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.edit-mode .form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.2rem
+    color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
