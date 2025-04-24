@@ -1,197 +1,97 @@
-import { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSignInAlt, faUserPlus } from "@fortawesome/free-solid-svg-icons";
-import { faGoogle, faGithub } from "@fortawesome/free-brands-svg-icons";
-import { AuthContext } from "../contexts/authContextDef";
-import "../styles/pages/Login.css";
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGithub, faGoogle } from '@fortawesome/free-brands-svg-icons';
+import { useAuth } from '../hooks/useAuth';
+import './Login.css';
 
 const Login = () => {
-  const { login, register } = useContext(AuthContext);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    name: "",
-  });
-
-  const validatePassword = (password) => {
-    if (password.length < 8) {
-      return "Password must be at least 8 characters long";
-    }
-    return null;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // Prevent multiple submissions
-
-    setError("");
-    setLoading(true);
+    setError('');
+    setIsLoading(true);
 
     try {
-      // Validate required fields
-      if (isLogin) {
-        if (!formData.email || !formData.password) {
-          throw new Error("Email and password are required");
-        }
-      } else {
-        if (!formData.email || !formData.password || !formData.name) {
-          throw new Error("All fields are required");
-        }
-
-        // Validate password
-        const passwordError = validatePassword(formData.password);
-        if (passwordError) {
-          throw new Error(passwordError);
-        }
-
-        if (formData.password !== formData.confirmPassword) {
-          throw new Error("Passwords do not match");
-        }
-      }
-
-      if (isLogin) {
-        await login({ email: formData.email, password: formData.password });
-        navigate("/");
-      } else {
-        await register({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-        });
-        navigate("/");
-      }
+      await login(email, password);
+      navigate('/dashboard');
     } catch (err) {
-      setError(err.message || "An error occurred. Please try again.");
-      setLoading(false); // Reset loading state on error
+      setError(err.message || 'Failed to login');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setError("");
-    setFormData({
-      email: "",
-      password: "",
-      confirmPassword: "",
-      name: "",
-    });
   };
 
   return (
     <div className="login-container">
       <div className="login-card">
-        <h2>{isLogin ? "Sign In" : "Create Account"}</h2>
-        <form onSubmit={handleSubmit}>
-          {!isLogin && (
-            <div className="mb-3">
-              <label htmlFor="name" className="form-label">
-                Name
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          )}
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label">
-              Email
-            </label>
+        <div className="login-header">
+          <h1>Welcome Back</h1>
+          <p>Log in to your account to continue</p>
+        </div>
+
+        {error && <div className="error-message">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
             <input
-              type="email"
-              className="form-control"
               id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
+              placeholder="Enter your email"
+              className="form-input"
             />
           </div>
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
+
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
             <input
-              type="password"
-              className="form-control"
               id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
+              placeholder="Enter your password"
+              className="form-input"
             />
           </div>
-          {!isLogin && (
-            <div className="mb-3">
-              <label htmlFor="confirmPassword" className="form-label">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                className="form-control"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          )}
-          <button
-            type="submit"
-            className="btn btn-primary w-100"
-            disabled={loading}
+
+          <button 
+            type="submit" 
+            className="btn btn-primary login-btn" 
+            disabled={isLoading}
           >
-            <FontAwesomeIcon
-              icon={isLogin ? faSignInAlt : faUserPlus}
-              className="me-2"
-            />
-            {loading
-              ? isLogin
-                ? "Signing in..."
-                : "Creating account..."
-              : isLogin
-              ? "Sign in"
-              : "Create account"}
+            {isLoading ? 'Logging in...' : 'Log In'}
           </button>
-          {error && <div className="error-message">{error}</div>}
         </form>
 
-        <div className="social-buttons">
-          <button className="social-button">
-            <FontAwesomeIcon icon={faGoogle} className="icon" />
-            Continue with Google
+        <div className="divider">
+          <span>Or continue with</span>
+        </div>
+
+        <div className="social-login">
+          <button className="btn social-btn github-btn">
+            <FontAwesomeIcon icon={faGithub} />
+            <span>GitHub</span>
           </button>
-          <button className="social-button">
-            <FontAwesomeIcon icon={faGithub} className="icon" />
-            Continue with GitHub
+          <button className="btn social-btn google-btn">
+            <FontAwesomeIcon icon={faGoogle} />
+            <span>Google</span>
           </button>
         </div>
 
-        <button className="mode-toggle" onClick={toggleMode}>
-          {isLogin
-            ? "Don't have an account? Sign up"
-            : "Already have an account? Sign in"}
-        </button>
+        <p className="signup-link">
+          Don't have an account? <Link to="/register">Sign up</Link>
+        </p>
       </div>
     </div>
   );

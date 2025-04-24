@@ -1,275 +1,248 @@
-import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faTasks,
-  faUsers,
-  faCheckCircle,
-  faComments,
-  faChartLine,
-  faChartPie,
-  faListAlt,
-} from "@fortawesome/free-solid-svg-icons";
-import { Line } from "react-chartjs-2";
-import { Pie } from "react-chartjs-2";
+import { useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
+  BarElement,
   LineElement,
+  PointElement,
   Title,
-  Tooltip as ChartTooltip,
+  Tooltip,
   Legend,
-  ArcElement,
-} from "chart.js";
-import "../styles/pages/Analytics.css";
+  ArcElement
+} from 'chart.js';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import './Analytics.css';
 
+// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  PointElement,
+  BarElement,
   LineElement,
+  PointElement,
+  ArcElement,
   Title,
-  ChartTooltip,
-  Legend,
-  ArcElement
+  Tooltip,
+  Legend
 );
 
 const Analytics = () => {
-  const [timeRange, setTimeRange] = useState("week");
-  const [activityType, setActivityType] = useState("all");
+  const [workspaceData, setWorkspaceData] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Sample data - replace with actual API calls
-  const stats = {
-    tasks: 157,
-    teams: 12,
-    completedTasks: 89,
-    messages: 432,
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const response = await fetch('/api/analytics/workspace');
+        const data = await response.json();
+        setWorkspaceData(data);
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [selectedPeriod]);
+
+  if (isLoading) {
+    return <div className="loading">Loading analytics...</div>;
+  }
+
+  if (!workspaceData) {
+    return <div className="error-state">Failed to load analytics data</div>;
+  }
+
+  const { projects, tasks, timeTracking, users } = workspaceData;
+
+  // Chart configurations
+  const projectStatusConfig = {
+    labels: projects.byStatus.map(s => s._id),
+    datasets: [{
+      label: 'Projects by Status',
+      data: projects.byStatus.map(s => s.count),
+      backgroundColor: [
+        'rgba(37, 99, 235, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(245, 158, 11, 0.8)',
+        'rgba(239, 68, 68, 0.8)'
+      ],
+    }]
   };
 
-  const taskData = [
-    { name: "Mon", tasks: 12 },
-    { name: "Tue", tasks: 19 },
-    { name: "Wed", tasks: 15 },
-    { name: "Thu", tasks: 22 },
-    { name: "Fri", tasks: 18 },
-    { name: "Sat", tasks: 10 },
-    { name: "Sun", tasks: 8 },
-  ];
-
-  const pieData = [
-    { name: "Completed", value: 89 },
-    { name: "In Progress", value: 45 },
-    { name: "Todo", value: 23 },
-  ];
-
-  const COLORS = ["#22c55e", "#f59e0b", "#3b82f6"];
-
-  const recentActivity = [
-    {
-      task: "Update dashboard UI",
-      assignee: "John Doe",
-      status: "completed",
-      date: "2025-04-22",
-    },
-    {
-      task: "Implement analytics features",
-      assignee: "Jane Smith",
-      status: "in-progress",
-      date: "2025-04-21",
-    },
-    {
-      task: "Fix notification bugs",
-      assignee: "Mike Johnson",
-      status: "todo",
-      date: "2025-04-20",
-    },
-  ];
-
-  const lineChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
+  const taskProgressConfig = {
+    labels: tasks.byStatus.map(s => s._id),
+    datasets: [{
+      label: 'Tasks by Status',
+      data: tasks.byStatus.map(s => s.count),
+      borderColor: 'rgb(37, 99, 235)',
+      backgroundColor: 'rgba(37, 99, 235, 0.1)',
+      tension: 0.3
+    }]
   };
 
-  const lineChartData = {
-    labels: taskData.map((item) => item.name),
-    datasets: [
-      {
-        label: "Tasks",
-        data: taskData.map((item) => item.tasks),
-        borderColor: "#3b82f6",
-        tension: 0.1,
-      },
-    ],
+  const userPerformanceConfig = {
+    labels: users.taskDistribution.map(u => u.name),
+    datasets: [{
+      label: 'Task Completion Rate (%)',
+      data: users.taskDistribution.map(u => u.completionRate),
+      backgroundColor: 'rgba(37, 99, 235, 0.8)',
+    }]
   };
 
-  const pieChartData = {
-    labels: pieData.map((item) => item.name),
-    datasets: [
-      {
-        data: pieData.map((item) => item.value),
-        backgroundColor: COLORS,
-      },
-    ],
-  };
-
-  const pieChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
+  const timeTrackingConfig = {
+    labels: ['Estimated', 'Actual'],
+    datasets: [{
+      data: [timeTracking.totalEstimated, timeTracking.totalActual],
+      backgroundColor: [
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(37, 99, 235, 0.8)'
+      ],
+    }]
   };
 
   return (
-    <div className="analytics-container">
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon tasks">
-            <FontAwesomeIcon icon={faTasks} />
-          </div>
-          <div className="stat-content">
-            <h3 className="stat-value">{stats.tasks}</h3>
-            <div className="stat-label">Total Tasks</div>
-          </div>
+    <div className="analytics">
+      <header className="analytics-header">
+        <h1>Workspace Analytics</h1>
+        <div className="period-selector">
+          <select 
+            value={selectedPeriod} 
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="period-select"
+          >
+            <option value="week">Last Week</option>
+            <option value="month">Last Month</option>
+            <option value="quarter">Last Quarter</option>
+            <option value="year">Last Year</option>
+          </select>
         </div>
+      </header>
 
-        <div className="stat-card">
-          <div className="stat-icon teams">
-            <FontAwesomeIcon icon={faUsers} />
-          </div>
-          <div className="stat-content">
-            <h3 className="stat-value">{stats.teams}</h3>
-            <div className="stat-label">Active Teams</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon completed">
-            <FontAwesomeIcon icon={faCheckCircle} />
-          </div>
-          <div className="stat-content">
-            <h3 className="stat-value">{stats.completedTasks}</h3>
-            <div className="stat-label">Completed Tasks</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon messages">
-            <FontAwesomeIcon icon={faComments} />
-          </div>
-          <div className="stat-content">
-            <h3 className="stat-value">{stats.messages}</h3>
-            <div className="stat-label">Messages</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="chart-grid">
-        <div className="chart-card">
-          <div className="chart-header">
-            <h4 className="chart-title">
-              <FontAwesomeIcon icon={faChartLine} className="me-2" />
-              Task Progress
-            </h4>
-            <div className="chart-filters">
-              <button
-                className={`btn btn-sm ${
-                  timeRange === "week" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => setTimeRange("week")}
-              >
-                Week
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  timeRange === "month" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => setTimeRange("month")}
-              >
-                Month
-              </button>
+      <div className="metrics-overview">
+        <div className="metric-card">
+          <h3>Projects</h3>
+          <div className="metric-numbers">
+            <div className="metric">
+              <span className="label">Total</span>
+              <span className="value">{projects.total}</span>
+            </div>
+            <div className="metric">
+              <span className="label">Active</span>
+              <span className="value highlight">{projects.active}</span>
+            </div>
+            <div className="metric">
+              <span className="label">Completed</span>
+              <span className="value success">{projects.completed}</span>
             </div>
           </div>
-          <div style={{ height: "300px" }}>
-            <Line options={lineChartOptions} data={lineChartData} />
+        </div>
+
+        <div className="metric-card">
+          <h3>Tasks</h3>
+          <div className="metric-numbers">
+            <div className="metric">
+              <span className="label">Total</span>
+              <span className="value">{tasks.total}</span>
+            </div>
+            <div className="metric">
+              <span className="label">In Progress</span>
+              <span className="value highlight">{tasks.inProgress}</span>
+            </div>
+            <div className="metric">
+              <span className="label">Completed</span>
+              <span className="value success">{tasks.completed}</span>
+            </div>
           </div>
         </div>
 
-        <div className="chart-card">
-          <div className="chart-header">
-            <h4 className="chart-title">
-              <FontAwesomeIcon icon={faChartPie} className="me-2" />
-              Task Distribution
-            </h4>
-          </div>
-          <div style={{ height: "300px" }}>
-            <Pie data={pieChartData} options={pieChartOptions} />
+        <div className="metric-card">
+          <h3>Time Tracking</h3>
+          <div className="metric-numbers">
+            <div className="metric">
+              <span className="label">Estimated</span>
+              <span className="value">{timeTracking.totalEstimated}h</span>
+            </div>
+            <div className="metric">
+              <span className="label">Actual</span>
+              <span className="value highlight">{timeTracking.totalActual}h</span>
+            </div>
+            <div className="metric">
+              <span className="label">Efficiency</span>
+              <span className="value">
+                {Math.round((timeTracking.totalEstimated / timeTracking.totalActual) * 100)}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="chart-card">
-        <div className="chart-header">
-          <h4 className="chart-title">
-            <FontAwesomeIcon icon={faListAlt} className="me-2" />
-            Recent Activity
-          </h4>
-          <div className="chart-filters">
-            <button
-              className={`btn btn-sm ${
-                activityType === "all" ? "btn-primary" : "btn-outline-primary"
-              }`}
-              onClick={() => setActivityType("all")}
-            >
-              All
-            </button>
-            <button
-              className={`btn btn-sm ${
-                activityType === "tasks" ? "btn-primary" : "btn-outline-primary"
-              }`}
-              onClick={() => setActivityType("tasks")}
-            >
-              Tasks
-            </button>
-            <button
-              className={`btn btn-sm ${
-                activityType === "teams" ? "btn-primary" : "btn-outline-primary"
-              }`}
-              onClick={() => setActivityType("teams")}
-            >
-              Teams
-            </button>
+      <div className="charts-grid">
+        <section className="chart-section">
+          <h2>Project Status Distribution</h2>
+          <div className="chart-container">
+            <Bar 
+              data={projectStatusConfig}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: 'bottom' }
+                }
+              }}
+            />
           </div>
-        </div>
+        </section>
 
-        <table className="activity-table">
-          <thead>
-            <tr>
-              <th>Task</th>
-              <th>Assignee</th>
-              <th>Status</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentActivity.map((activity, index) => (
-              <tr key={index}>
-                <td>{activity.task}</td>
-                <td>{activity.assignee}</td>
-                <td>
-                  <span className={`status-badge ${activity.status}`}>
-                    {activity.status.charAt(0).toUpperCase() +
-                      activity.status.slice(1)}
-                  </span>
-                </td>
-                <td>{new Date(activity.date).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <section className="chart-section">
+          <h2>Task Progress Overview</h2>
+          <div className="chart-container">
+            <Line 
+              data={taskProgressConfig}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: 'bottom' }
+                }
+              }}
+            />
+          </div>
+        </section>
+
+        <section className="chart-section">
+          <h2>Team Performance</h2>
+          <div className="chart-container">
+            <Bar 
+              data={userPerformanceConfig}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: 'bottom' }
+                },
+                scales: {
+                  y: { beginAtZero: true, max: 100 }
+                }
+              }}
+            />
+          </div>
+        </section>
+
+        <section className="chart-section">
+          <h2>Time Tracking Analysis</h2>
+          <div className="chart-container">
+            <Doughnut 
+              data={timeTrackingConfig}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { position: 'bottom' }
+                }
+              }}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
