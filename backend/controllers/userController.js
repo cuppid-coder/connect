@@ -1,67 +1,35 @@
 const User = require("../models/User");
-const jwt = require("jsonwebtoken");
+const admin = require('firebase-admin');
 
-// Register new user
-exports.register = async (req, res) => {
+// Register or sync user from Firebase
+exports.registerOrSync = async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { firebaseToken } = req.body;
 
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: "User already exists" });
+    if (!firebaseToken) {
+      return res.status(400).json({ message: "Firebase token is required" });
     }
 
-    // Create new user
-    user = new User({
-      email,
-      password,
-      name,
-    });
-
-    await user.save();
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.status(201).json({
-      user,
-      token,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Login user
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
+    // Verify the Firebase token
+    const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
+    
     // Check if user exists
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ firebaseUID: decodedToken.uid });
+    
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      // Create new user
+      user = new User({
+        email: decodedToken.email,
+        name: decodedToken.name || decodedToken.email.split('@')[0],
+        firebaseUID: decodedToken.uid,
+        avatar: decodedToken.picture || "",
+      });
+      await user.save();
     }
 
-    // Verify password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.json({
-      user,
-      token,
-    });
+    res.status(200).json({ user });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -70,7 +38,6 @@ exports.login = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find()
-      .select("-password")
       .populate("teams", "name");
     res.status(200).json(users);
   } catch (error) {
@@ -82,7 +49,6 @@ exports.getUsers = async (req, res) => {
 exports.getUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .select("-password")
       .populate("teams", "name");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -103,7 +69,7 @@ exports.updateUser = async (req, res) => {
       req.params.id,
       { $set: updates },
       { new: true }
-    ).select("-password");
+    );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -128,13 +94,306 @@ exports.updateStatus = async (req, res) => {
         },
       },
       { new: true }
-    ).select("-password");
+    );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
     res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Revoke user access
+exports.revokeAccess = async (req, res) => {
+  try {
+    const { firebaseUID } = req.params;
+
+    // Revoke Firebase tokens
+    await admin.auth().revokeRefreshTokens(firebaseUID);
+    
+    // Update user status
+    await User.findOneAndUpdate(
+      { firebaseUID },
+      { 
+        $set: { 
+          status: 'offline',
+          lastSeen: Date.now(),
+          socketId: null
+        }
+      }
+    );
+
+    res.status(200).json({ message: 'User access revoked successfully' });
+  } catch (error) {
+    console.error('Revoke access error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Send contact request
+exports.sendContactRequest = async (req, res) => {
+  try {
+    const { toUserId } = req.body;
+    const fromUserId = req.user._id;
+
+    // Check if users exist
+    const [toUser, fromUser] = await Promise.all([
+      User.findById(toUserId),
+      User.findById(fromUserId)
+    ]);
+
+    if (!toUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if request already exists
+    const existingRequest = toUser.contactRequests.find(
+      request => request.from.toString() === fromUserId.toString()
+    );
+    if (existingRequest) {
+      return res.status(400).json({ message: "Contact request already sent" });
+    }
+
+    // Check if they are already contacts
+    const isContact = toUser.contacts.some(
+      contact => contact.user.toString() === fromUserId.toString()
+    );
+    if (isContact) {
+      return res.status(400).json({ message: "Users are already contacts" });
+    }
+
+    // Add request to recipient's requests
+    toUser.contactRequests.push({ from: fromUserId });
+    await toUser.save();
+
+    // Create notification for recipient
+    await createNotification({
+      recipient: toUserId,
+      type: "CONTACT_REQUEST",
+      title: "New Contact Request",
+      content: `${fromUser.name} wants to add you as a contact`,
+      reference: {
+        model: "User",
+        id: fromUserId
+      }
+    });
+
+    res.status(200).json({ message: "Contact request sent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Handle contact request (accept/reject)
+exports.handleContactRequest = async (req, res) => {
+  try {
+    const { requestId, action } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const request = user.contactRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    if (action === 'accept') {
+      // Add each user to the other's contacts
+      await Promise.all([
+        User.findByIdAndUpdate(userId, {
+          $push: { contacts: { user: request.from } },
+          $pull: { contactRequests: { _id: requestId } }
+        }),
+        User.findByIdAndUpdate(request.from, {
+          $push: { contacts: { user: userId } }
+        })
+      ]);
+
+      // Create notification for sender
+      await createNotification({
+        recipient: request.from,
+        type: "CONTACT_ACCEPTED",
+        title: "Contact Request Accepted",
+        content: `${user.name} accepted your contact request`,
+        reference: {
+          model: "User",
+          id: userId
+        }
+      });
+    } else {
+      // Remove request if rejected
+      await User.findByIdAndUpdate(userId, {
+        $pull: { contactRequests: { _id: requestId } }
+      });
+    }
+
+    res.status(200).json({ message: `Contact request ${action}ed successfully` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get user contacts
+exports.getContacts = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId)
+      .populate('contacts.user', 'name email avatar status lastSeen')
+      .populate('contactRequests.from', 'name email avatar');
+
+    res.status(200).json({
+      contacts: user.contacts,
+      pendingRequests: user.contactRequests.filter(r => r.status === 'pending')
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Remove contact
+exports.removeContact = async (req, res) => {
+  try {
+    const { contactId } = req.params;
+    const userId = req.user._id;
+
+    // Remove contact from both users
+    await Promise.all([
+      User.findByIdAndUpdate(userId, {
+        $pull: { contacts: { user: contactId } }
+      }),
+      User.findByIdAndUpdate(contactId, {
+        $pull: { contacts: { user: userId } }
+      })
+    ]);
+
+    res.status(200).json({ message: "Contact removed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Search users
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const userId = req.user._id;
+
+    const users = await User.find({
+      $and: [
+        { _id: { $ne: userId } },
+        {
+          $or: [
+            { name: { $regex: query, $options: 'i' } },
+            { email: { $regex: query, $options: 'i' } }
+          ]
+        }
+      ]
+    })
+    .select('name email avatar status lastSeen')
+    .limit(10);
+
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Demo endpoint to send a friend request
+exports.sendDemoFriendRequest = async (req, res) => {
+  try {
+    const { targetUserId } = req.body;
+    const fromUserId = req.user._id;
+
+    // Get socket manager instance
+    const socketManager = global.app.get("socketManager");
+    
+    // Create a notification for the friend request
+    await createNotification({
+      recipient: targetUserId,
+      type: "CONTACT_REQUEST",
+      title: "New Friend Request",
+      content: `${req.user.name} sent you a friend request`,
+      reference: {
+        model: "User",
+        id: fromUserId
+      }
+    });
+
+    // Handle the friend request through socket
+    await socketManager.handleFriendRequest(req.user, targetUserId);
+
+    res.json({ success: true, message: "Friend request sent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Demo endpoint to handle friend request response
+exports.handleDemoFriendRequest = async (req, res) => {
+  try {
+    const { requestId, accept } = req.body;
+    const socketManager = global.app.get("socketManager");
+
+    const request = await Notification.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    // Update the notification status
+    request.read = true;
+    await request.save();
+
+    // Handle the response through socket
+    await socketManager.handleFriendRequest(req.user, request.reference.id, accept);
+
+    if (accept) {
+      // Create acceptance notification
+      await createNotification({
+        recipient: request.reference.id,
+        type: "CONTACT_ACCEPTED",
+        title: "Friend Request Accepted",
+        content: `${req.user.name} accepted your friend request`,
+        reference: {
+          model: "User",
+          id: req.user._id
+        }
+      });
+    }
+
+    res.json({ success: true, message: `Friend request ${accept ? 'accepted' : 'declined'}` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Demo endpoint to request direct message
+exports.requestDemoDirectMessage = async (req, res) => {
+  try {
+    const { targetUserId } = req.body;
+    const socketManager = global.app.get("socketManager");
+
+    // Create notification for message request
+    await createNotification({
+      recipient: targetUserId,
+      type: "MESSAGE_REQUEST",
+      title: "New Message Request",
+      content: `${req.user.name} wants to send you a message`,
+      reference: {
+        model: "User",
+        id: req.user._id
+      }
+    });
+
+    // Handle the message request through socket
+    await socketManager.handleMessageRequest(req.user, targetUserId);
+
+    res.json({ success: true, message: "Message request sent successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

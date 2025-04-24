@@ -49,6 +49,26 @@ const teamSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'request_to_join'],
+      default: 'private'
+    },
+    joinRequests: [{
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      requestedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     settings: {
       notifications: {
         newMembers: {

@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
@@ -15,10 +14,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    password: {
+    firebaseUID: {
       type: String,
       required: true,
-      minlength: 6,
+      unique: true,
     },
     avatar: {
       type: String,
@@ -29,6 +28,35 @@ const userSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: "Team",
       },
+    ],
+    contacts: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        addedAt: {
+          type: Date,
+          default: Date.now,
+        }
+      }
+    ],
+    contactRequests: [
+      {
+        from: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        status: {
+          type: String,
+          enum: ["pending", "accepted", "rejected"],
+          default: "pending"
+        },
+        sentAt: {
+          type: Date,
+          default: Date.now,
+        }
+      }
     ],
     status: {
       type: String,
@@ -66,40 +94,15 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Index for efficient user lookup by email
+// Index for efficient user lookup by email and firebaseUID
 userSchema.index({ email: 1 });
+userSchema.index({ firebaseUID: 1 });
 
 // Index for finding online users
 userSchema.index({ status: 1 });
 
 // Compound index for team membership queries
 userSchema.index({ teams: 1, status: 1 });
-
-// Hash password before saving
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Method to compare password
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
-};
-
-// Don't send password in JSON responses
-userSchema.set("toJSON", {
-  transform: function (doc, ret, options) {
-    delete ret.password;
-    return ret;
-  },
-});
 
 // Instance method to check if user is member of a team
 userSchema.methods.isMemberOfTeam = function (teamId) {
@@ -111,7 +114,7 @@ userSchema.statics.findOnlineTeamMembers = async function (teamId) {
   return this.find({
     teams: teamId,
     status: "online",
-  }).select("-password");
+  });
 };
 
 module.exports = mongoose.model("User", userSchema);

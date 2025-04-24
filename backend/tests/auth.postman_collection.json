@@ -1,0 +1,117 @@
+{
+  "info": {
+    "_postman_id": "unique-id",
+    "name": "Connect - Authentication Tests",
+    "description": "Test collection for Connect app authentication using Firebase",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register or Sync User",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"firebaseToken\": \"{{firebaseToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/users/auth/register-or-sync",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "auth", "register-or-sync"]
+        },
+        "description": "Register or sync a user using Firebase token"
+      }
+    },
+    {
+      "name": "Get User Profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{firebaseToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/{{userId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "{{userId}}"]
+        },
+        "description": "Get user profile (protected route)"
+      }
+    },
+    {
+      "name": "Update User Status",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{firebaseToken}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"userId\": \"{{userId}}\",\n    \"status\": \"online\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/users/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "status"]
+        },
+        "description": "Update user status (protected route)"
+      }
+    },
+    {
+      "name": "Revoke User Access",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{firebaseToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/revoke/{{firebaseUID}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "revoke", "{{firebaseUID}}"]
+        },
+        "description": "Revoke user access (protected route)"
+      }
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// You can add pre-request scripts here",
+          "// For example, to refresh Firebase token if needed"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ]
+}

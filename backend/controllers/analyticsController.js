@@ -329,3 +329,135 @@ exports.getUserAnalytics = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Get team performance analytics
+exports.getTeamAnalytics = async (req, res) => {
+  try {
+    const teamId = req.params.teamId;
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    // Team project metrics
+    const projectMetrics = await Project.aggregate([
+      { $match: { team: teamId, ...dateFilter } },
+      {
+        $group: {
+          _id: null,
+          totalProjects: { $sum: 1 },
+          activeProjects: {
+            $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+          },
+          completedProjects: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    // Team task metrics
+    const taskMetrics = await Task.aggregate([
+      { $match: { team: teamId, ...dateFilter } },
+      {
+        $group: {
+          _id: null,
+          totalTasks: { $sum: 1 },
+          completedTasks: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+          timeEstimated: { $sum: "$timeTracking.estimated" },
+          timeSpent: { $sum: "$timeTracking.actual" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalTasks: 1,
+          completedTasks: 1,
+          completionRate: {
+            $multiply: [{ $divide: ["$completedTasks", "$totalTasks"] }, 100],
+          },
+          timeEstimated: 1,
+          timeSpent: 1,
+          efficiency: {
+            $multiply: [
+              {
+                $divide: [
+                  "$timeEstimated",
+                  { $cond: [{ $eq: ["$timeSpent", 0] }, 1, "$timeSpent"] },
+                ],
+              },
+              100,
+            ],
+          },
+        },
+      },
+    ]);
+
+    // Member performance metrics
+    const memberMetrics = await Task.aggregate([
+      { $match: { team: teamId, ...dateFilter } },
+      { $unwind: "$assignees" },
+      {
+        $group: {
+          _id: "$assignees",
+          tasksAssigned: { $sum: 1 },
+          tasksCompleted: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+          timeSpent: { $sum: "$timeTracking.actual" },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          name: "$user.name",
+          tasksAssigned: 1,
+          tasksCompleted: 1,
+          timeSpent: 1,
+          completionRate: {
+            $multiply: [
+              { $divide: ["$tasksCompleted", "$tasksAssigned"] },
+              100,
+            ],
+          },
+        },
+      },
+    ]);
+
+    res.json({
+      teamId,
+      projectMetrics: projectMetrics[0] || {
+        totalProjects: 0,
+        activeProjects: 0,
+        completedProjects: 0,
+      },
+      taskMetrics: taskMetrics[0] || {
+        totalTasks: 0,
+        completedTasks: 0,
+        completionRate: 0,
+        timeEstimated: 0,
+        timeSpent: 0,
+        efficiency: 0,
+      },
+      memberMetrics,
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

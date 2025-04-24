@@ -19,7 +19,11 @@ const notificationSchema = new mongoose.Schema(
         "MENTION",
         "COMMENT",
         "PROJECT_UPDATE",
+        "PROJECT_COMMENT",
+        "TASK_COMMENT",
         "DEADLINE_REMINDER",
+        "CONTACT_REQUEST",
+        "CONTACT_ACCEPTED"
       ],
       required: true,
     },

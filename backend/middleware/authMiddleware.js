@@ -1,29 +1,29 @@
+const admin = require('firebase-admin');
+const firebaseConfig = require('../config/firebase.config');
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Team = require("../models/Team");
+const Project = require("../models/Project");
+const Task = require("../models/Task");
 
-const authenticate = async (req, res, next) => {
+// Initialize Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(firebaseConfig)
+});
+
+const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-
+    const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) {
-      return res.status(401).json({ message: "Authentication required" });
+      return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    req.user = user;
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
     next();
   } catch (error) {
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ message: "Invalid token" });
-    }
-    res.status(500).json({ message: "Server error" });
+    console.error('Auth Error:', error);
+    res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
 
@@ -81,8 +81,86 @@ const validateChatAccess = async (req, res, next) => {
   }
 };
 
+// Middleware to check project access
+const validateProjectAccess = async (req, res, next) => {
+  try {
+    const projectId = req.params.id;
+    const userId = req.user._id;
+
+    const project = await Project.findById(projectId)
+      .populate('team');
+    
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check visibility settings
+    if (project.visibility === 'private') {
+      // Only project members can access
+      if (!project.members.some(member => member.user.toString() === userId.toString())) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else if (project.visibility === 'team_only') {
+      // Check if user is in the team
+      if (!project.team.members.some(member => member.user.toString() === userId.toString())) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+    // Public projects are accessible to all
+
+    req.project = project;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Middleware to check task access
+const validateTaskAccess = async (req, res, next) => {
+  try {
+    const taskId = req.params.id;
+    const userId = req.user._id;
+
+    const task = await Task.findById(taskId)
+      .populate({
+        path: 'project',
+        populate: { path: 'team' }
+      });
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Check task visibility
+    if (task.visibility === 'private') {
+      // Only assignees and creator can access
+      if (!task.assignees.includes(userId) && task.creator.toString() !== userId.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else if (task.visibility === 'project') {
+      // Check if user is project member
+      if (!task.project.members.some(member => member.user.toString() === userId.toString())) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else if (task.visibility === 'team') {
+      // Check if user is team member
+      if (!task.project.team.members.some(member => member.user.toString() === userId.toString())) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+    // Public tasks are accessible to all
+
+    req.task = task;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
-  authenticate,
+  authMiddleware,
   validateTeamMembership,
   validateChatAccess,
+  validateProjectAccess,
+  validateTaskAccess
 };

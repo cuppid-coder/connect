@@ -113,6 +113,15 @@ const taskSchema = new mongoose.Schema(
       },
     ],
     completedAt: Date,
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'project', 'team'],
+      default: 'project'
+    },
+    isPrivate: {
+      type: Boolean,
+      default: false
+    },
   },
   {
     timestamps: true,

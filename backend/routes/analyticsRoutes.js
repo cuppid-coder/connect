@@ -1,22 +1,16 @@
 const express = require("express");
 const router = express.Router();
 const {
-  getWorkspaceAnalytics,
-  getProjectAnalytics,
   getUserAnalytics,
+  getProjectAnalytics,
+  getTeamAnalytics,
 } = require("../controllers/analyticsController");
-const { authenticate } = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
-router.use(authenticate);
+router.use(authMiddleware);
 
-// Workspace-wide analytics
-router.get("/workspace", getWorkspaceAnalytics);
-
-// Project-specific analytics
-router.get("/projects/:projectId", getProjectAnalytics);
-
-// User performance analytics - separate routes for all users and specific user
-router.get("/users", getUserAnalytics);
-router.get("/users/:userId", getUserAnalytics);
+router.get("/user/:userId", getUserAnalytics);
+router.get("/project/:projectId", getProjectAnalytics);
+router.get("/team/:teamId", getTeamAnalytics);
 
 module.exports = router;

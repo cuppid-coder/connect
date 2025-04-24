@@ -105,6 +105,49 @@ const projectSchema = new mongoose.Schema(
         },
       },
     ],
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'team_only'],
+      default: 'team_only'
+    },
+    accessControl: {
+      canViewTasks: {
+        type: String,
+        enum: ['public', 'team', 'members_only'],
+        default: 'members_only'
+      },
+      canJoinProject: {
+        type: String,
+        enum: ['anyone', 'team_members', 'invite_only'],
+        default: 'team_members'
+      }
+    },
+    comments: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true
+        },
+        content: {
+          type: String,
+          required: true
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        },
+        edited: {
+          type: Boolean,
+          default: false
+        },
+        editedAt: Date,
+        mentions: [{
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User"
+        }]
+      }
+    ],
   },
   {
     timestamps: true,

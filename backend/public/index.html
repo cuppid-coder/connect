@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect API Documentation</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>Connect API</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#introduction">Introduction</a></li>
+            <li><a href="#authentication">Authentication</a></li>
+            <li>
+                <a href="#endpoints">Endpoints</a>
+                <ul>
+                    <li><a href="#users">Users</a></li>
+                    <li><a href="#projects">Projects</a></li>
+                    <li><a href="#tasks">Tasks</a></li>
+                    <li><a href="#teams">Teams</a></li>
+                    <li><a href="#messages">Messages</a></li>
+                    <li><a href="#notifications">Notifications</a></li>
+                    <li><a href="#search">Search</a></li>
+                    <li><a href="#analytics">Analytics</a></li>
+                </ul>
+            </li>
+            <li><a href="#errors">Error Handling</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <section id="introduction">
+            <h2>Introduction</h2>
+            <p>Welcome to the Connect API documentation. This API provides a comprehensive set of endpoints for managing projects, tasks, teams, messages, and analytics in a collaborative workspace environment.</p>
+            <p>Base URL: <code>http://localhost:3000/api</code> (development) or your production URL</p>
+        </section>
+
+        <section id="authentication">
+            <h2>Authentication</h2>
+            <p>All API endpoints except for registration require authentication. Use Firebase Authentication tokens in the Authorization header:</p>
+            <pre><code>Authorization: Bearer YOUR_FIREBASE_TOKEN</code></pre>
+        </section>
+
+        <section id="endpoints">
+            <h2>API Endpoints</h2>
+
+            <section id="users" class="endpoint-group">
+                <h3>Users</h3>
+                <div class="endpoint">
+                    <h4>Register or Sync User</h4>
+                    <p class="method">POST /users/auth/register-or-sync</p>
+                    <p>Registers a new user or syncs existing Firebase user data.</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Get All Users</h4>
+                    <p class="method">GET /users</p>
+                    <p>Retrieves a list of all users.</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Get User Profile</h4>
+                    <p class="method">GET /users/:id</p>
+                    <p>Retrieves a specific user's profile.</p>
+                </div>
+            </section>
+
+            <section id="projects" class="endpoint-group">
+                <h3>Projects</h3>
+                <div class="endpoint">
+                    <h4>List Projects</h4>
+                    <p class="method">GET /projects</p>
+                    <p>Query Parameters:</p>
+                    <ul>
+                        <li>page (default: 1)</li>
+                        <li>limit (default: 10)</li>
+                        <li>status</li>
+                        <li>priority</li>
+                        <li>team</li>
+                        <li>search</li>
+                    </ul>
+                </div>
+                <div class="endpoint">
+                    <h4>Create Project</h4>
+                    <p class="method">POST /projects</p>
+                    <p>Required fields: name, description, startDate, endDate, teamId</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Project Analytics</h4>
+                    <p class="method">GET /projects/:id/analytics</p>
+                    <p>Retrieves detailed analytics for a specific project.</p>
+                </div>
+            </section>
+
+            <section id="tasks" class="endpoint-group">
+                <h3>Tasks</h3>
+                <div class="endpoint">
+                    <h4>List Tasks</h4>
+                    <p class="method">GET /tasks</p>
+                    <p>Query Parameters:</p>
+                    <ul>
+                        <li>page (default: 1)</li>
+                        <li>limit (default: 20)</li>
+                        <li>status</li>
+                        <li>priority</li>
+                        <li>project</li>
+                        <li>assignee</li>
+                        <li>tags</li>
+                    </ul>
+                </div>
+                <div class="endpoint">
+                    <h4>Task Time Tracking</h4>
+                    <p class="method">POST /tasks/:id/time/start</p>
+                    <p class="method">POST /tasks/:id/time/stop</p>
+                </div>
+            </section>
+
+            <section id="teams" class="endpoint-group">
+                <h3>Teams</h3>
+                <div class="endpoint">
+                    <h4>List Teams</h4>
+                    <p class="method">GET /teams</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Create Team</h4>
+                    <p class="method">POST /teams</p>
+                    <p>Required fields: name, leader</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Team Analytics</h4>
+                    <p class="method">GET /teams/:teamId/analytics</p>
+                </div>
+            </section>
+
+            <section id="messages" class="endpoint-group">
+                <h3>Messages</h3>
+                <div class="endpoint">
+                    <h4>Get Chat Messages</h4>
+                    <p class="method">GET /messages/chat/:chatId</p>
+                    <p>Query Parameters: page, limit</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Send Message</h4>
+                    <p class="method">POST /messages</p>
+                    <p>Required fields: chatId, content</p>
+                </div>
+            </section>
+
+            <section id="notifications" class="endpoint-group">
+                <h3>Notifications</h3>
+                <div class="endpoint">
+                    <h4>List Notifications</h4>
+                    <p class="method">GET /notifications</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Mark as Read</h4>
+                    <p class="method">PUT /notifications/:id/read</p>
+                </div>
+            </section>
+
+            <section id="search" class="endpoint-group">
+                <h3>Search</h3>
+                <div class="endpoint">
+                    <h4>Global Search</h4>
+                    <p class="method">GET /search/global</p>
+                    <p>Query Parameters: query</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Advanced Search</h4>
+                    <p class="method">GET /search/advanced</p>
+                    <p>Query Parameters: query, type, status, priority, assignee, tags, dateRange</p>
+                </div>
+            </section>
+
+            <section id="analytics" class="endpoint-group">
+                <h3>Analytics</h3>
+                <div class="endpoint">
+                    <h4>User Analytics</h4>
+                    <p class="method">GET /analytics/user/:userId</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Project Analytics</h4>
+                    <p class="method">GET /analytics/project/:projectId</p>
+                </div>
+                <div class="endpoint">
+                    <h4>Team Analytics</h4>
+                    <p class="method">GET /analytics/team/:teamId</p>
+                </div>
+            </section>
+        </section>
+
+        <section id="errors">
+            <h2>Error Handling</h2>
+            <p>The API uses conventional HTTP response codes to indicate the success or failure of requests:</p>
+            <ul>
+                <li>200: Success</li>
+                <li>201: Created</li>
+                <li>400: Bad Request</li>
+                <li>401: Unauthorized</li>
+                <li>403: Forbidden</li>
+                <li>404: Not Found</li>
+                <li>500: Internal Server Error</li>
+            </ul>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="/js/main.js"></script>
+</body>
+</html>

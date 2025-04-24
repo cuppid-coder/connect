@@ -4,6 +4,7 @@ const socketIo = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 const SocketManager = require("../utils/socketManager");
 
 // Routes
@@ -14,9 +15,10 @@ const taskRoutes = require("../routes/taskRoutes");
 const notificationRoutes = require("../routes/notificationRoutes");
 const searchRoutes = require("../routes/searchRoutes");
 const analyticsRoutes = require("../routes/analyticsRoutes");
+const projectRoutes = require("../routes/projectRoutes");
 
 // Middleware
-const { authenticate } = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 dotenv.config();
 
@@ -38,6 +40,29 @@ const socketManager = new SocketManager(io);
 socketManager.initialize();
 app.set("socketManager", socketManager);
 
+// Comment rooms handling
+io.of("/comments").on("connection", (socket) => {
+  socket.on("join_comment_thread", ({ projectId, taskId }) => {
+    const roomId = projectId ? `project:${projectId}:comments` : `task:${taskId}:comments`;
+    socketManager.joinCommentRoom(socket, roomId);
+  });
+
+  socket.on("leave_comment_thread", ({ projectId, taskId }) => {
+    const roomId = projectId ? `project:${projectId}:comments` : `task:${taskId}:comments`;
+    socketManager.leaveCommentRoom(socket, roomId);
+  });
+
+  socket.on("typing_comment", ({ projectId, taskId }) => {
+    const roomId = projectId ? `project:${projectId}:comments` : `task:${taskId}:comments`;
+    socketManager.handleCommentTyping(roomId, socket.user, true);
+  });
+
+  socket.on("stop_typing_comment", ({ projectId, taskId }) => {
+    const roomId = projectId ? `project:${projectId}:comments` : `task:${taskId}:comments`;
+    socketManager.handleCommentTyping(roomId, socket.user, false);
+  });
+});
+
 // Middleware
 app.use(
   cors({
@@ -47,6 +72,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "../public")));
 
 // Connect to MongoDB with enhanced options
 mongoose
@@ -63,22 +89,25 @@ mongoose
 
 // Routes
 app.use("/api/users", userRoutes);
-app.use("/api/messages", authenticate, (req, res, next) =>
+app.use("/api/messages", authMiddleware, (req, res, next) =>
   messageRoutes(req, res, next)
 );
-app.use("/api/teams", authenticate, (req, res, next) =>
+app.use("/api/teams", authMiddleware, (req, res, next) =>
   teamRoutes(req, res, next)
 );
-app.use("/api/tasks", authenticate, (req, res, next) =>
+app.use("/api/tasks", authMiddleware, (req, res, next) =>
   taskRoutes(req, res, next)
 );
-app.use("/api/notifications", authenticate, (req, res, next) =>
+app.use("/api/projects", authMiddleware, (req, res, next) =>
+  projectRoutes(req, res, next)
+);
+app.use("/api/notifications", authMiddleware, (req, res, next) =>
   notificationRoutes(req, res, next)
 );
-app.use("/api/search", authenticate, (req, res, next) =>
+app.use("/api/search", authMiddleware, (req, res, next) =>
   searchRoutes(req, res, next)
 );
-app.use("/api/analytics", authenticate, (req, res, next) =>
+app.use("/api/analytics", authMiddleware, (req, res, next) =>
   analyticsRoutes(req, res, next)
 );
 

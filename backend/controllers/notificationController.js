@@ -28,6 +28,47 @@ exports.getNotifications = async (req, res) => {
   }
 };
 
+// Get all online users
+exports.getOnlineUsers = async (req, res) => {
+  try {
+    const socketManager = global.app.get("socketManager");
+    const onlineUsers = socketManager.getOnlineUsers();
+    res.json(onlineUsers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get pending friend requests
+exports.getPendingRequests = async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      recipient: req.user._id,
+      type: "CONTACT_REQUEST",
+      read: false
+    }).populate("reference.id", "name avatar status");
+    
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get message requests
+exports.getMessageRequests = async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      recipient: req.user._id,
+      type: "MESSAGE_REQUEST",
+      read: false
+    }).populate("reference.id", "name avatar status");
+    
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Mark notifications as read
 exports.markAsRead = async (req, res) => {
   try {

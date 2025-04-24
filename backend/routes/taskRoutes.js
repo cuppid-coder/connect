@@ -11,23 +11,26 @@ const {
   addComment,
   updateSubtask,
 } = require("../controllers/taskController");
-const { authenticate } = require("../middleware/authMiddleware");
+const { 
+  authMiddleware,
+  validateTaskAccess 
+} = require("../middleware/authMiddleware");
 
-router.use(authenticate);
+router.use(authMiddleware);
 
 // Task CRUD routes
 router.get("/", getTasks);
-router.get("/:id", getTaskById);
+router.get("/:id", validateTaskAccess, getTaskById);
 router.post("/", createTask);
-router.put("/:id", updateTask);
-router.delete("/:id", deleteTask);
+router.put("/:id", validateTaskAccess, updateTask);
+router.delete("/:id", validateTaskAccess, deleteTask);
 
 // Time tracking routes
-router.post("/:id/time/start", startTimeTracking);
-router.post("/:id/time/stop", stopTimeTracking);
+router.post("/:id/time/start", validateTaskAccess, startTimeTracking);
+router.post("/:id/time/stop", validateTaskAccess, stopTimeTracking);
 
 // Comments and subtasks
-router.post("/:id/comments", addComment);
-router.put("/:id/subtasks", updateSubtask);
+router.post("/:id/comments", validateTaskAccess, addComment);
+router.put("/:id/subtasks", validateTaskAccess, updateSubtask);
 
 module.exports = router;

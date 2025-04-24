@@ -1,6 +1,7 @@
 const Project = require("../models/Project");
 const Task = require("../models/Task");
 const Team = require("../models/Team");
+const User = require("../models/User");
 const { createNotification } = require("./notificationController");
 
 // Get all projects (with filtering and pagination)
@@ -18,6 +19,7 @@ exports.getProjects = async (req, res) => {
     } = req.query;
 
     const query = {};
+    const userId = req.user._id;
 
     // Apply filters
     if (status) query.status = status;
@@ -28,6 +30,19 @@ exports.getProjects = async (req, res) => {
     if (search) {
       query.$text = { $search: search };
     }
+
+    // Handle visibility
+    query.$or = [
+      { visibility: 'public' },
+      { 'members.user': userId },
+      // Show team_only projects where user is in the team
+      {
+        $and: [
+          { visibility: 'team_only' },
+          { team: { $in: (await User.findById(userId)).teams } }
+        ]
+      }
+    ];
 
     const projects = await Project.find(query)
       .populate("team", "name")
@@ -87,6 +102,11 @@ exports.createProject = async (req, res) => {
       tags,
       priority,
       budget,
+      visibility = 'team_only',
+      accessControl = {
+        canViewTasks: 'members_only',
+        canJoinProject: 'team_members'
+      }
     } = req.body;
 
     // Verify team exists
@@ -106,30 +126,34 @@ exports.createProject = async (req, res) => {
       tags,
       priority,
       budget,
+      visibility,
+      accessControl
     });
 
     await project.save();
 
-    // Notify team members
-    const notification = {
-      type: "PROJECT_UPDATE",
-      title: "New Project Created",
-      content: `You have been added to the project: ${name}`,
-      reference: {
-        model: "Project",
-        id: project._id,
-      },
-    };
+    // Only notify team members if project is not private
+    if (visibility !== 'private') {
+      const notification = {
+        type: "PROJECT_UPDATE",
+        title: "New Project Created",
+        content: `A new project has been created: ${name}`,
+        reference: {
+          model: "Project",
+          id: project._id,
+        },
+      };
 
-    // Notify team members
-    team.members.forEach(async (memberId) => {
-      if (memberId.toString() !== req.user._id.toString()) {
-        await createNotification({
-          ...notification,
-          recipient: memberId,
-        });
-      }
-    });
+      // Notify team members
+      team.members.forEach(async (memberId) => {
+        if (memberId.toString() !== req.user._id.toString()) {
+          await createNotification({
+            ...notification,
+            recipient: memberId,
+          });
+        }
+      });
+    }
 
     res.status(201).json(project);
   } catch (error) {
@@ -162,6 +186,9 @@ exports.updateProject = async (req, res) => {
     if (updates.endDate && updates.endDate !== project.endDate) {
       significantChanges.push("Timeline updated");
     }
+    if (updates.visibility && updates.visibility !== project.visibility) {
+      significantChanges.push(`Visibility changed to ${updates.visibility}`);
+    }
 
     Object.keys(updates).forEach((update) => {
       project[update] = updates[update];
@@ -170,7 +197,7 @@ exports.updateProject = async (req, res) => {
     await project.save();
 
     // Send notifications for significant changes
-    if (significantChanges.length > 0) {
+    if (significantChanges.length > 0 && project.visibility !== 'private') {
       const notification = {
         type: "PROJECT_UPDATE",
         title: "Project Updated",
@@ -363,6 +390,171 @@ exports.removeMember = async (req, res) => {
     });
 
     res.json(project);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Add comment to project
+exports.addComment = async (req, res) => {
+  try {
+    const { content } = req.body;
+    const project = await Project.findById(req.params.id)
+      .populate("members.user", "name")
+      .populate("manager", "name");
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Check if user has access to comment
+    const canComment = project.members.some(
+      member => member.user._id.toString() === req.user._id.toString()
+    ) || project.manager._id.toString() === req.user._id.toString();
+
+    if (!canComment) {
+      return res.status(403).json({ message: "Not authorized to comment on this project" });
+    }
+
+    // Extract mentions from content (format: @userId)
+    const mentionRegex = /@([a-f\d]{24})/gi;
+    const mentions = [...content.matchAll(mentionRegex)].map(match => match[1]);
+
+    const comment = {
+      user: req.user._id,
+      content,
+      mentions: mentions
+    };
+
+    project.comments.push(comment);
+    await project.save();
+
+    // Get socket manager instance
+    const socketManager = global.app.get("socketManager");
+
+    // Notify project members about the new comment
+    const notifyUsers = project.members.map(member => member.user._id);
+    if (!notifyUsers.includes(project.manager._id)) {
+      notifyUsers.push(project.manager._id);
+    }
+
+    const commentData = {
+      ...comment,
+      projectId: project._id,
+      projectName: project.name,
+      userName: req.user.name
+    };
+
+    // Send real-time notification to project members
+    socketManager.notifyProjectMembers(project._id, "new_project_comment", commentData);
+
+    // Send notifications for mentions
+    if (mentions.length > 0) {
+      mentions.forEach(async (userId) => {
+        await createNotification({
+          recipient: userId,
+          type: "MENTION",
+          title: "Mentioned in Project Comment",
+          content: `You were mentioned in a comment on project "${project.name}"`,
+          reference: {
+            model: "Project",
+            id: project._id
+          }
+        });
+      });
+    }
+
+    // Notify other project members
+    notifyUsers.forEach(async (userId) => {
+      if (userId.toString() !== req.user._id.toString() && !mentions.includes(userId.toString())) {
+        await createNotification({
+          recipient: userId,
+          type: "COMMENT",
+          title: "New Comment on Project",
+          content: `New comment on project "${project.name}"`,
+          reference: {
+            model: "Project",
+            id: project._id
+          }
+        });
+      }
+    });
+
+    res.json(project.comments[project.comments.length - 1]);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Edit project comment
+exports.editComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const project = await Project.findOne({ "comments._id": commentId });
+
+    if (!project) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const comment = project.comments.id(commentId);
+
+    if (comment.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to edit this comment" });
+    }
+
+    comment.content = content;
+    comment.edited = true;
+    comment.editedAt = new Date();
+
+    await project.save();
+
+    // Get socket manager instance
+    const socketManager = global.app.get("socketManager");
+
+    // Notify about comment edit
+    socketManager.notifyProjectMembers(project._id, "project_comment_edited", {
+      commentId,
+      content,
+      projectId: project._id
+    });
+
+    res.json(comment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete project comment
+exports.deleteComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const project = await Project.findOne({ "comments._id": commentId });
+
+    if (!project) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const comment = project.comments.id(commentId);
+
+    if (comment.user.toString() !== req.user._id.toString() && 
+        project.manager.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to delete this comment" });
+    }
+
+    comment.remove();
+    await project.save();
+
+    // Get socket manager instance
+    const socketManager = global.app.get("socketManager");
+
+    // Notify about comment deletion
+    socketManager.notifyProjectMembers(project._id, "project_comment_deleted", {
+      commentId,
+      projectId: project._id
+    });
+
+    res.json({ message: "Comment deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

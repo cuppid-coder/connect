@@ -1,5 +1,6 @@
 const Task = require("../models/Task");
 const Project = require("../models/Project");
+const User = require("../models/User");
 const { createNotification } = require("./notificationController");
 
 // Get tasks with filtering and pagination
@@ -18,6 +19,7 @@ exports.getTasks = async (req, res) => {
     } = req.query;
 
     const query = {};
+    const userId = req.user._id;
 
     // Apply filters
     if (status) query.status = status;
@@ -35,6 +37,39 @@ exports.getTasks = async (req, res) => {
     if (search) {
       query.$text = { $search: search };
     }
+
+    // Handle visibility
+    query.$or = [
+      { visibility: 'public' },
+      { assignees: userId },
+      { creator: userId },
+      // Show project tasks if user is project member
+      {
+        $and: [
+          { visibility: 'project' },
+          {
+            project: {
+              $in: await Project.find({ 'members.user': userId }).distinct('_id')
+            }
+          }
+        ]
+      },
+      // Show team tasks if user is team member
+      {
+        $and: [
+          { visibility: 'team' },
+          {
+            project: {
+              $in: await Project.find({ 
+                team: { 
+                  $in: (await User.findById(userId)).teams 
+                } 
+              }).distinct('_id')
+            }
+          }
+        ]
+      }
+    ];
 
     const tasks = await Task.find(query)
       .populate("project", "name")
@@ -90,12 +125,20 @@ exports.createTask = async (req, res) => {
       estimated,
       dependencies,
       subtasks,
+      visibility = 'project',
+      isPrivate = false
     } = req.body;
 
     // Verify project exists and user has access
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId)
+      .populate('team');
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Check if user has permission to create tasks in this project
+    if (!project.members.some(member => member.user.toString() === req.user._id.toString())) {
+      return res.status(403).json({ message: "Not authorized to create tasks in this project" });
     }
 
     const task = new Task({
@@ -110,6 +153,8 @@ exports.createTask = async (req, res) => {
       timeTracking: { estimated },
       dependencies: dependencies || [],
       subtasks: subtasks || [],
+      visibility,
+      isPrivate
     });
 
     await task.save();
@@ -118,19 +163,24 @@ exports.createTask = async (req, res) => {
     project.tasks.push(task._id);
     await project.save();
 
-    // Notify assignees
-    assignees.forEach(async (assigneeId) => {
-      await createNotification({
-        recipient: assigneeId,
-        type: "TASK_ASSIGNED",
-        title: "New Task Assignment",
-        content: `You have been assigned to task: ${title}`,
-        reference: {
-          model: "Task",
-          id: task._id,
-        },
+    // Only notify if task is not private
+    if (!isPrivate) {
+      // Notify assignees
+      assignees?.forEach(async (userId) => {
+        if (userId.toString() !== req.user._id.toString()) {
+          await createNotification({
+            recipient: userId,
+            type: "TASK_ASSIGNED",
+            title: "New Task Assignment",
+            content: `You have been assigned to task: ${title}`,
+            reference: {
+              model: "Task",
+              id: task._id,
+            },
+          });
+        }
       });
-    });
+    }
 
     res.status(201).json(task);
   } catch (error) {
